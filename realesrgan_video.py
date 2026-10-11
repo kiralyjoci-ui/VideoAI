@@ -23,6 +23,7 @@ def main():
     p.add_argument('--model', default='/workspace/ComfyUI/models/upscale_models/RealESRGAN_x4plus.pth')
     p.add_argument('--frames', type=int, default=10)
     p.add_argument('--tile', type=int, default=256)
+    p.add_argument('--scale', type=int, choices=[1,2,4], default=2)
     args = p.parse_args()
     if args.tile < 64 or args.frames < 0:
         p.error('tile must be >=64 and frames >=0')
@@ -48,7 +49,7 @@ def main():
     model.to(device)
 
     w, h, fps = video_info(source)
-    scale = 2
+    scale = args.scale
     reader = subprocess.Popen([
         'ffmpeg', '-nostdin', '-v', 'error', '-i', str(source),
         '-map', '0:v:0', '-f', 'rawvideo', '-pix_fmt', 'rgb24', 'pipe:1'
