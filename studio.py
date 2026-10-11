@@ -54,6 +54,7 @@ class Settings(BaseModel):
     gamma: float = Field(1.9, ge=0.1, le=5)
     brightness: float = Field(0.06, ge=-1, le=1)
     contrast: float = Field(1.12, ge=0.1, le=5)
+    ffmpeg_filter: str = 'basic'
     scunet: bool = True
     scunet_model: str = 'scunet_color_real_psnr'
     realesrgan: bool = True
@@ -92,7 +93,7 @@ def probe(path):
 def validate(s):
     allowed = {'scunet_color_real_psnr', 'scunet_color_real_gan',
                'scunet_color_15', 'scunet_color_25', 'scunet_color_50'}
-    if s.scunet_model not in allowed or s.scale not in (1, 2, 4):
+    if s.scunet_model not in allowed or s.scale not in (1, 2, 4) or s.ffmpeg_filter not in ('basic', 'legacy_aggressive'):
         raise HTTPException(400, 'Invalid model or scale')
     if s.scunet and not Path('/workspace/SCUNet/model_zoo', s.scunet_model + '.pth').is_file():
         raise HTTPException(400, 'SCUNet model missing')
@@ -212,6 +213,8 @@ def pipeline(job, settings, preview=False):
         if s.ffmpeg:
             adjusted = scratch / 'corrected.mp4'
             vf = f'eq=gamma={s.gamma}:brightness={s.brightness}:contrast={s.contrast}'
+            if s.ffmpeg_filter == 'legacy_aggressive':
+                vf += ',hqdn3d=6:4:9:6,unsharp=5:5:0.6'
             execute(job, ['ffmpeg','-y','-v','error','-i',str(current),'-vf',vf,
                           '-an','-c:v','libx264','-crf','17','-pix_fmt','yuv420p',
                           str(adjusted)], 'FFmpeg correction')
