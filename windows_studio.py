@@ -5,6 +5,7 @@ SSH tunnel must forward localhost:17860 to RunPod localhost:7860.
 import os
 from pathlib import Path
 import httpx
+import base64
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from contextlib import asynccontextmanager
@@ -46,13 +47,13 @@ async def proxy(path: str, request: Request):
     async def incoming():
         async for chunk in request.stream():
             yield chunk
+    headers["authorization"] = "Basic " + base64.b64encode((USERNAME + ":" + password).encode()).decode()
     client = request.app.state.client
     try:
         req = client.build_request(
             request.method, REMOTE + "/api/" + path,
             params=request.query_params, headers=headers,
             content=incoming() if request.method in ("POST", "PUT") else None,
-            auth=(USERNAME, password),
         )
         response = await client.send(req, stream=True)
     except httpx.HTTPError as exc:
