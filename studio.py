@@ -196,7 +196,12 @@ def pipeline(job, settings, preview=False):
                           '-i',str(src),'-frames:v','1',str(still)], 'Extracting preview')
             if not still.is_file():
                 raise RuntimeError('Cannot extract frame at this time')
-            current = still
+            # Convert still to a one-frame MP4 for video-only GPU scripts.
+            one_frame = scratch / 'preview_source.mp4'
+            execute(job, ['ffmpeg','-y','-v','error','-loop','1','-framerate','1',
+                          '-i',str(still),'-frames:v','1','-c:v','libx264',
+                          '-pix_fmt','yuv420p',str(one_frame)], 'Preparing preview')
+            current = one_frame
             seconds = 1
         elif s.test_seconds:
             trimmed = scratch / 'trim.mp4'
