@@ -35,9 +35,8 @@ def main():
 
     # ComfyUI includes the ESRGAN RRDB architecture and uses this checkpoint already.
     sys.path.insert(0, '/workspace/ComfyUI')
-    from comfy_extras.nodes_upscale_model import load_torch_file
+    from comfy.utils import load_torch_file, tiled_scale
     from comfy_extras.chainner_models import model_loading
-    from comfy import model_management
 
     state = load_torch_file(str(weights), safe_load=True)
     if 'params_ema' in state:
@@ -72,7 +71,7 @@ def main():
                 frame = np.frombuffer(raw, np.uint8).reshape(h,w,3).copy()
                 x = torch.from_numpy(frame).permute(2,0,1).unsqueeze(0).float().to(device)/255
                 # ComfyUI tiled upscale, avoiding full-resolution GPU inference.
-                upscaled = model_management.tiled_scale(
+                upscaled = tiled_scale(
                     x, lambda tile: model(tile), tile_x=args.tile,
                     tile_y=args.tile, overlap=32, upscale_amount=model.scale,
                     out_channels=3, output_device=device,
