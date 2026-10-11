@@ -25,6 +25,7 @@ a{color:#8db9ff}.hidden{display:none!important}.note{font-size:12px;color:#99a7c
 <div class="row"><input type="file" id="upload" accept="video/*,.avi,.mkv"><button id="uploadBtn">Feltöltés</button></div>
 <div id="meta" class="muted"></div></div>
 <div class="panel stack"><div class="row"><h2>2. FFmpeg képkorrekció</h2><input type="checkbox" id="ffmpeg" checked></div>
+<div class="field"><label>FFmpeg szűrés</label><select id="ffmpeg_filter"><option value="basic">Csak fényerő / kontraszt (jelenlegi)</option><option value="legacy_aggressive">Korábbi erős változat: hqdn3d + unsharp (teszt)</option></select></div>
 <div class="field"><label>Gamma: <span id="gammaVal"></span></label><input id="gamma" type="range" min=".5" max="3" step=".05" value="1.9"></div>
 <div class="field"><label>Fényerő: <span id="brightnessVal"></span></label><input id="brightness" type="range" min="-.3" max=".3" step=".01" value=".06"></div>
 <div class="field"><label>Kontraszt: <span id="contrastVal"></span></label><input id="contrast" type="range" min=".5" max="2" step=".01" value="1.12"></div></div>
@@ -78,7 +79,7 @@ async function refreshFiles(selected) {
 }
 function settings() {
  return {filename:$('filename').value,ffmpeg:$('ffmpeg').checked,
- gamma:+$('gamma').value,brightness:+$('brightness').value,contrast:+$('contrast').value,
+ ffmpeg_filter:$('ffmpeg_filter').value,gamma:+$('gamma').value,brightness:+$('brightness').value,contrast:+$('contrast').value,
  scunet:$('scunet').checked,scunet_model:$('scunet_model').value,
  realesrgan:$('realesrgan').checked,scale:+$('scale').value,
  preview_second:+$('preview_second').value,test_seconds:+$('test_seconds').value};
@@ -91,9 +92,9 @@ $('uploadBtn').onclick=async()=>{const f=$('upload').files[0];if(!f)return alert
  catch(e){alert(e.message)}finally{$('uploadBtn').disabled=false}};
 $('applyPreset').onclick=()=>{
  const p=$('preset').value;
- if(p==='camera'){Object.assign($('ffmpeg'),{checked:true});$('gamma').value=1.9;$('brightness').value=.06;$('contrast').value=1.12;$('scunet').checked=true;$('scunet_model').value='scunet_color_real_psnr';$('realesrgan').checked=true;$('scale').value='2'}
- if(p==='noisy'){$('ffmpeg').checked=true;$('gamma').value=1.7;$('brightness').value=.04;$('contrast').value=1.1;$('scunet').checked=true;$('scunet_model').value='scunet_color_real_gan';$('realesrgan').checked=false}
- if(p==='upscale'){$('ffmpeg').checked=false;$('scunet').checked=false;$('realesrgan').checked=true;$('scale').value='2'}
+ if(p==='camera'){$('ffmpeg_filter').value='legacy_aggressive';Object.assign($('ffmpeg'),{checked:true});$('gamma').value=1.9;$('brightness').value=.06;$('contrast').value=1.12;$('scunet').checked=true;$('scunet_model').value='scunet_color_real_psnr';$('realesrgan').checked=true;$('scale').value='2'}
+ if(p==='noisy'){$('ffmpeg_filter').value='legacy_aggressive';$('ffmpeg').checked=true;$('gamma').value=1.7;$('brightness').value=.04;$('contrast').value=1.1;$('scunet').checked=true;$('scunet_model').value='scunet_color_real_gan';$('realesrgan').checked=false}
+ if(p==='upscale'){$('ffmpeg_filter').value='basic';$('ffmpeg').checked=false;$('scunet').checked=false;$('realesrgan').checked=true;$('scale').value='2'}
  syncSliders();
 };
 $('split').oninput=()=>{$('processedImage').style.clipPath='inset(0 '+(100-$('split').value)+'% 0 0)'};
