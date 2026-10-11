@@ -191,19 +191,19 @@ def pipeline(job, settings, preview=False):
         duration = probe(src)['duration']
         seconds = min(duration, s.test_seconds) if s.test_seconds else duration
         if preview:
-            # Extract one frame at the selected time, with correct timestamps.
-            still = scratch / 'frame.png'
-            execute(job, ['ffmpeg','-y','-v','error','-ss',str(s.preview_second),
-                          '-i',str(src),'-frames:v','1',str(still)], 'Extracting preview')
-            if not still.is_file():
-                raise RuntimeError('Cannot extract frame at this time')
-            # Convert still to a one-frame MP4 for video-only GPU scripts.
-            one_frame = scratch / 'preview_source.mp4'
-            execute(job, ['ffmpeg','-y','-v','error','-loop','1','-framerate','1',
-                          '-i',str(still),'-frames:v','1','-c:v','libx264',
-                          '-pix_fmt','yuv420p',str(one_frame)], 'Preparing preview')
-            current = one_frame
-            seconds = 1
+            # Feed real consecutive frames to temporal filters (hqdn3d).
+            # The selected frame is the final frame of this short segment.
+            fps = probe(src)['fps']
+            target = max(0.0, min(s.preview_second, max(0.0, duration - 1.0 / fps)))
+            clip_start = max(0.0, target - 1.5)
+            clip_length = min(duration - clip_start, target - clip_start + 1.0 / fps)
+            clip = scratch / 'preview_source.mp4'
+            execute(job, ['ffmpeg','-y','-v','error','-ss',str(clip_start),
+                          '-i',str(src),'-t',str(clip_length),
+                          '-map','0:v:0','-an','-c:v','libx264','-crf','17',
+                          '-pix_fmt','yuv420p',str(clip)], 'Preparing temporal preview')
+            current = clip
+            seconds = clip_length
         elif s.test_seconds:
             trimmed = scratch / 'trim.mp4'
             execute(job, ['ffmpeg','-y','-v','error','-i',str(src),'-t',str(seconds),
@@ -236,8 +236,9 @@ def pipeline(job, settings, preview=False):
             current = enlarged
         if preview:
             final = OUTPUTS / (jid + '.png')
+            # Reverse only the short preview segment to take its final frame.
             execute(job, ['ffmpeg','-y','-v','error','-i',str(current),
-                          '-frames:v','1',str(final)], 'Saving preview')
+                          '-vf','reverse','-frames:v','1',str(final)], 'Saving preview')
         else:
             final = OUTPUTS / (jid + '.mp4')
             # Retain source audio if present, and preserve processed video timestamps.
