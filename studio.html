@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="hu"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VideoAI Studio</title>
+<style>
+:root{color-scheme:dark;font-family:Inter,system-ui,Arial;background:#10141d;color:#e8edf7}
+*{box-sizing:border-box}body{margin:0}header{background:#181f2d;border-bottom:1px solid #303b50;padding:19px 24px;display:flex;align-items:center;justify-content:space-between}
+h1{font-size:23px;margin:0}h2{font-size:16px;margin:0 0 15px}small,.muted{color:#99a7c1}main{max-width:1250px;margin:24px auto;padding:0 18px;display:grid;grid-template-columns:minmax(320px,450px) minmax(350px,1fr);gap:18px}
+.panel{background:#1a2231;border:1px solid #344055;border-radius:14px;padding:20px;margin-bottom:18px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px}.stack{display:grid;gap:14px}
+input,select,button{font:inherit}input[type=number],select{width:100%;background:#111927;border:1px solid #44516a;border-radius:8px;padding:10px;color:#f1f4ff}
+input[type=range]{width:100%;accent-color:#76a7ff}input[type=checkbox]{width:20px;height:20px;accent-color:#76a7ff}
+button{border:1px solid #546683;border-radius:9px;background:#27364e;color:white;padding:11px 15px;cursor:pointer}button.primary{background:#346bd8;border-color:#346bd8;font-weight:650}button.danger{background:#602d3c}button:disabled{opacity:.45;cursor:not-allowed}
+.field{display:grid;gap:6px}.field label{font-size:13px;color:#b6c4da}.inline{display:flex;gap:10px;align-items:center}.inline input{max-width:115px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.preview{width:100%;max-height:520px;object-fit:contain;background:#0a0e15;border-radius:10px}
+.compare{position:relative;overflow:hidden;border-radius:10px;background:#0a0e15}.compare img{display:block;width:100%;height:auto}.compare .top{position:absolute;inset:0;object-fit:contain;clip-path:inset(0 50% 0 0)}.compare input{position:absolute;bottom:8px;left:5%;width:90%}
+progress{width:100%;height:18px;accent-color:#76a7ff}#status{white-space:pre-wrap;overflow-wrap:anywhere;font-size:13px;color:#b5c4d8}
+a{color:#8db9ff}.hidden{display:none!important}.note{font-size:12px;color:#99a7c1;margin-top:8px}
+@media(max-width:820px){main{grid-template-columns:1fr}}
+</style></head><body>
+<header><h1>🎞 VideoAI Studio</h1><small>RunPod · GPU-feldolgozás</small></header>
+<main>
+<section>
+<div class="panel stack"><h2>1. Videó kiválasztása</h2>
+<div class="field"><label>Korábban feltöltött videók</label><select id="filename"></select></div>
+<div class="row"><input type="file" id="upload" accept="video/*,.avi,.mkv"><button id="uploadBtn">Feltöltés</button></div>
+<div id="meta" class="muted"></div></div>
+<div class="panel stack"><div class="row"><h2>2. FFmpeg képkorrekció</h2><input type="checkbox" id="ffmpeg" checked></div>
+<div class="field"><label>Gamma: <span id="gammaVal"></span></label><input id="gamma" type="range" min=".5" max="3" step=".05" value="1.9"></div>
+<div class="field"><label>Fényerő: <span id="brightnessVal"></span></label><input id="brightness" type="range" min="-.3" max=".3" step=".01" value=".06"></div>
+<div class="field"><label>Kontraszt: <span id="contrastVal"></span></label><input id="contrast" type="range" min=".5" max="2" step=".01" value="1.12"></div></div>
+<div class="panel stack"><div class="row"><h2>3. SCUNet zajmentesítés</h2><input type="checkbox" id="scunet" checked></div>
+<div class="field"><label>Modell</label><select id="scunet_model">
+<option value="scunet_color_real_psnr">Real PSNR</option><option value="scunet_color_real_gan">Real GAN</option>
+<option value="scunet_color_15">Color 15</option><option value="scunet_color_25">Color 25</option><option value="scunet_color_50">Color 50</option></select></div></div>
+<div class="panel stack"><div class="row"><h2>4. RealESRGAN felskálázás</h2><input type="checkbox" id="realesrgan" checked></div>
+<div class="field"><label>Kimeneti méret</label><select id="scale"><option value="1">1× – eredeti méret</option><option value="2" selected>2× – ajánlott</option><option value="4">4×</option></select></div></div>
+<div class="panel stack"><h2>Beállításprofil</h2>
+<select id="preset"><option value="camera">Régi minikamera</option><option value="noisy">Erősen zajos</option><option value="upscale">Csak felskálázás</option><option value="custom">Egyéni</option></select>
+<button id="applyPreset">Profil alkalmazása</button></div>
+</section>
+<section>
+<div class="panel stack"><h2>5. Előnézet és összehasonlítás</h2>
+<div class="inline"><label for="preview_second">Képkocka ideje (mp)</label><input type="number" id="preview_second" min="0" step=".1" value="1"></div>
+<div class="row"><button id="originalBtn">Eredeti képkocka</button><button id="previewBtn" class="primary">AI-előnézet készítése</button></div>
+<div id="comparison" class="compare hidden"><img id="originalImage" alt="Eredeti képkocka"><img id="processedImage" class="top" alt="Feldolgozott képkocka"><input id="split" type="range" min="0" max="100" value="50"></div>
+<div class="note">Az elhúzható választóvonallal összehasonlíthatod az eredetit és a feldolgozott képet.</div></div>
+<div class="panel stack"><h2>6. Videófeldolgozás</h2>
+<div class="field"><label>Tesztrészlet hossza</label><select id="test_seconds"><option value="0">Teljes videó</option><option value="3">3 másodperc</option><option value="10">10 másodperc</option></select></div>
+<div class="row"><button class="primary" id="startBtn">Feldolgozás indítása</button><button class="danger" id="cancelBtn" disabled>Megszakítás</button></div>
+<progress id="progress" max="100" value="0"></progress><div id="status">Nincs futó feladat.</div>
+<a id="download" class="hidden" target="_blank">Eredmény megnyitása / letöltése</a>
+<div class="note">A képkockák egyenként kerülnek a GPU-ra. A forrásvideó nem módosul.</div></div>
+</section></main>
+<script>
+const $=id=>document.getElementById(id);
+let jobId=null, polling=null;
+async function api(url, options={}) {
+ const r=await fetch(url,options);
+ if(!r.ok){let t=await r.text();throw Error(t.slice(0,350))}
+ return r.json();
+}
+async function refreshFiles(selected) {
+ const files=await api('/api/files');
+ $('filename').innerHTML='';
+ files.forEach(f=>{const o=document.createElement('option');o.value=f.name;o.textContent=f.name;$('filename').append(o)});
+ if(selected)$('filename').value=selected;
+ const show=()=>{const f=files.find(f=>f.name===$('filename').value);
+ $('meta').textContent=f?(f.width?f.width+' × '+f.height+' · '+f.fps.toFixed(2)+' FPS · '+f.duration.toFixed(1)+' mp':'Méret: '+Math.round(f.size/1024/1024)+' MB'):'Nincs videó feltöltve'};
+ $('filename').onchange=show;show();
+}
+function settings() {
+ return {filename:$('filename').value,ffmpeg:$('ffmpeg').checked,
+ gamma:+$('gamma').value,brightness:+$('brightness').value,contrast:+$('contrast').value,
+ scunet:$('scunet').checked,scunet_model:$('scunet_model').value,
+ realesrgan:$('realesrgan').checked,scale:+$('scale').value,
+ preview_second:+$('preview_second').value,test_seconds:+$('test_seconds').value};
+}
+function syncSliders(){['gamma','brightness','contrast'].forEach(k=>$(k+'Val').textContent=$(k).value)}
+['gamma','brightness','contrast'].forEach(k=>$(k).oninput=syncSliders);syncSliders();
+$('uploadBtn').onclick=async()=>{const f=$('upload').files[0];if(!f)return alert('Válassz videót!');
+ const data=new FormData();data.append('file',f);$('uploadBtn').disabled=true;$('status').textContent='Feltöltés folyamatban...';
+ try{const r=await api('/api/upload',{method:'POST',body:data});await refreshFiles(r.name);$('status').textContent='Feltöltve: '+r.name}
+ catch(e){alert(e.message)}finally{$('uploadBtn').disabled=false}};
+$('applyPreset').onclick=()=>{
+ const p=$('preset').value;
+ if(p==='camera'){Object.assign($('ffmpeg'),{checked:true});$('gamma').value=1.9;$('brightness').value=.06;$('contrast').value=1.12;$('scunet').checked=true;$('scunet_model').value='scunet_color_real_psnr';$('realesrgan').checked=true;$('scale').value='2'}
+ if(p==='noisy'){$('ffmpeg').checked=true;$('gamma').value=1.7;$('brightness').value=.04;$('contrast').value=1.1;$('scunet').checked=true;$('scunet_model').value='scunet_color_real_gan';$('realesrgan').checked=false}
+ if(p==='upscale'){$('ffmpeg').checked=false;$('scunet').checked=false;$('realesrgan').checked=true;$('scale').value='2'}
+ syncSliders();
+};
+$('split').oninput=()=>{$('processedImage').style.clipPath='inset(0 '+(100-$('split').value)+'% 0 0)'};
+async function begin(preview, original=false){
+ if(!$('filename').value)return alert('Előbb válassz videót!');
+ const s=settings();
+ if(original){s.ffmpeg=false;s.scunet=false;s.realesrgan=false}
+ $('download').classList.add('hidden');
+ try{
+  const r=await api('/api/start?preview='+String(preview),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(s)});
+  jobId=r.id;$('startBtn').disabled=true;$('previewBtn').disabled=true;$('originalBtn').disabled=true;$('cancelBtn').disabled=false;
+  clearInterval(polling);polling=setInterval(()=>poll(preview,original),900);poll(preview,original);
+ }catch(e){alert(e.message)}
+}
+async function poll(preview,original){
+ if(!jobId)return;
+ try{
+ const j=await api('/api/jobs/'+jobId);
+ $('progress').value=j.percent;
+ const elapsed=Math.round(Date.now()/1000-j.started);
+ $('status').textContent=j.stage+' · '+j.percent+'% · '+elapsed+' mp\nKépkocka: '+j.stage_frame+'\n'+j.log;
+ if(j.status==='running')return;
+ clearInterval(polling);$('startBtn').disabled=false;$('previewBtn').disabled=false;$('originalBtn').disabled=false;$('cancelBtn').disabled=true;
+ if(j.status==='done'){
+  if(preview){
+   const target=original?'originalImage':'processedImage';
+   $(target).src=j.result+'?v='+Date.now();
+   if(original){$('originalImage').dataset.ready='1'}else{$('processedImage').dataset.ready='1'}
+   if($('originalImage').dataset.ready&&$('processedImage').dataset.ready)$('comparison').classList.remove('hidden');
+  }else{$('download').href=j.result;$('download').classList.remove('hidden')}
+ }else alert(j.status+': '+j.log);
+ jobId=null;
+ }catch(e){$('status').textContent=e.message}
+}
+$('startBtn').onclick=()=>begin(false);
+$('previewBtn').onclick=()=>begin(true);
+$('originalBtn').onclick=()=>begin(true,true);
+$('cancelBtn').onclick=async()=>{if(jobId)await api('/api/jobs/'+jobId+'/cancel',{method:'POST'})};
+refreshFiles().catch(e=>$('status').textContent=e.message);
+</script></body></html>
