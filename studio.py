@@ -55,6 +55,11 @@ class Settings(BaseModel):
     brightness: float = Field(0.06, ge=-1, le=1)
     contrast: float = Field(1.12, ge=0.1, le=5)
     ffmpeg_filter: str = 'basic'
+    denoise_luma_spatial: float = Field(6, ge=0, le=30)
+    denoise_chroma_spatial: float = Field(4, ge=0, le=30)
+    denoise_luma_temporal: float = Field(9, ge=0, le=30)
+    denoise_chroma_temporal: float = Field(6, ge=0, le=30)
+    sharpen: float = Field(0.6, ge=-2, le=2)
     scunet: bool = True
     scunet_model: str = 'scunet_color_real_psnr'
     realesrgan: bool = True
@@ -214,7 +219,9 @@ def pipeline(job, settings, preview=False):
             adjusted = scratch / 'corrected.mp4'
             vf = f'eq=gamma={s.gamma}:brightness={s.brightness}:contrast={s.contrast}'
             if s.ffmpeg_filter == 'legacy_aggressive':
-                vf += ',hqdn3d=6:4:9:6,unsharp=5:5:0.6'
+                vf += (f',hqdn3d={s.denoise_luma_spatial}:{s.denoise_chroma_spatial}:'
+                       f'{s.denoise_luma_temporal}:{s.denoise_chroma_temporal},'
+                       f'unsharp=5:5:{s.sharpen}')
             execute(job, ['ffmpeg','-y','-v','error','-i',str(current),'-vf',vf,
                           '-an','-c:v','libx264','-crf','17','-pix_fmt','yuv420p',
                           str(adjusted)], 'FFmpeg correction')
