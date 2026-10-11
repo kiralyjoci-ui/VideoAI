@@ -95,7 +95,26 @@ function syncAdvanced(){ $('advanced_ffmpeg').style.display=$('ffmpeg_filter').v
 $('ffmpeg_filter').addEventListener('change',syncAdvanced);syncAdvanced();
 $('uploadBtn').onclick=async()=>{const f=$('upload').files[0];if(!f)return alert('Válassz videót!');
  const data=new FormData();data.append('file',f);$('uploadBtn').disabled=true;$('status').textContent='Feltöltés folyamatban...';
- try{const r=await api('/api/upload',{method:'POST',body:data});await refreshFiles(r.name);$('status').textContent='Feltöltve: '+r.name}
+ try{
+   const r=await new Promise((resolve,reject)=>{
+     const xhr=new XMLHttpRequest();
+     xhr.open('POST','/api/upload');
+     xhr.timeout=30*60*1000;
+     let lastPercent=-1;
+     xhr.upload.onprogress=e=>{
+       if(e.lengthComputable){
+         const percent=Math.floor(e.loaded/e.total*100);
+         if(percent!==lastPercent){lastPercent=percent;$('status').textContent='Feltöltés Windowsra: '+percent+'% ('+(e.loaded/1048576).toFixed(1)+' / '+(e.total/1048576).toFixed(1)+' MB)';}
+       }else{$('status').textContent='Videó továbbítása folyamatban: '+(e.loaded/1048576).toFixed(1)+' MB';}
+     };
+     xhr.upload.onload=()=>{$('status').textContent='Windows fogadta a videót; RunPod továbbítás / ellenőrzés folyamatban...';};
+     xhr.onload=()=>{if(xhr.status>=200&&xhr.status<300){try{resolve(JSON.parse(xhr.responseText));}catch(e){reject(Error('Hibás szerverválasz'))}}else reject(Error('HTTP '+xhr.status+': '+xhr.responseText.slice(0,350)))};
+     xhr.onerror=()=>reject(Error('Hálózati hiba a feltöltés közben'));
+     xhr.ontimeout=()=>reject(Error('Feltöltési időtúllépés (30 perc)'));
+     xhr.onabort=()=>reject(Error('Feltöltés megszakítva'));
+     xhr.send(data);
+   });
+   await refreshFiles(r.name);$('status').textContent='Feltöltve: '+r.name}
  catch(e){alert(e.message)}finally{$('uploadBtn').disabled=false}};
 $('applyPreset').onclick=()=>{
  const p=$('preset').value;
