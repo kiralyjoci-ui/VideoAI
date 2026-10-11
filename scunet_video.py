@@ -43,7 +43,7 @@ def main():
     dst.parent.mkdir(parents=True, exist_ok=True)
     w, h, fps = probe_video(src)
     device = torch.device('cuda')
-    model = SCUNet(in_nc=3, config=[2]*7, dim=64).eval()
+    model = SCUNet(in_nc=3, config=[4]*7, dim=64).eval()
     model.load_state_dict(torch.load(weights, map_location='cpu', weights_only=True), strict=True)
     model.to(device)
     print(f'SCUNet loaded | {w}x{h} | {fps} fps | tile {args.tile}', flush=True)
