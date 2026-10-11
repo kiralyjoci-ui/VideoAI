@@ -206,7 +206,7 @@ def pipeline(job, settings, preview=False):
         elif s.test_seconds:
             trimmed = scratch / 'trim.mp4'
             execute(job, ['ffmpeg','-y','-v','error','-i',str(src),'-t',str(seconds),
-                          '-map','0:v:0','-an','-fps_mode','passthrough',
+                          '-map','0:v:0','-an',
                           '-c:v','libx264','-crf','17',str(trimmed)], 'Trimming test')
             current = trimmed
         if s.ffmpeg:
