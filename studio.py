@@ -1,5 +1,7 @@
 """VideoAI Studio web API. Run: uvicorn studio:app --host 0.0.0.0 --port 7860"""
 import json
+import base64
+import secrets
 import os
 import re
 import shutil
@@ -9,7 +11,8 @@ import threading
 import time
 import uuid
 from pathlib import Path
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, UploadFile, Request
+from fastapi.responses import Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
@@ -23,6 +26,23 @@ for folder in (INPUTS, OUTPUTS, TEMP):
 HERE = Path(__file__).resolve().parent
 PYTHON = sys.executable
 app = FastAPI(title='VideoAI Studio')
+
+@app.middleware('http')
+async def password_protection(request: Request, call_next):
+    password = os.environ.get('VIDEOAI_PASSWORD')
+    if not password:
+        return Response('Set VIDEOAI_PASSWORD before starting the server', status_code=503)
+    authorization = request.headers.get('authorization', '')
+    try:
+        scheme, token = authorization.split(' ', 1)
+        username, supplied = base64.b64decode(token).decode().split(':', 1)
+        valid = scheme.lower() == 'basic' and secrets.compare_digest(username, 'videoai') and secrets.compare_digest(supplied, password)
+    except (ValueError, UnicodeError, Exception):
+        valid = False
+    if not valid:
+        return Response('Authentication required', status_code=401, headers={'WWW-Authenticate':'Basic realm="VideoAI Studio"'})
+    return await call_next(request)
+
 jobs = {}
 lock = threading.Lock()
 active = None
