@@ -26,6 +26,11 @@ a{color:#8db9ff}.hidden{display:none!important}.note{font-size:12px;color:#99a7c
 <div id="meta" class="muted"></div></div>
 <div class="panel stack"><div class="row"><h2>2. FFmpeg képkorrekció</h2><input type="checkbox" id="ffmpeg" checked></div>
 <div class="field"><label>FFmpeg szűrés</label><select id="ffmpeg_filter"><option value="basic">Csak fényerő / kontraszt (jelenlegi)</option><option value="legacy_aggressive">Korábbi erős változat: hqdn3d + unsharp (teszt)</option></select></div>
+<div id="advanced_ffmpeg" class="stack"><div class="field"><label><b>HQDN3D zajszűrés és élesítés</b> – állítható paraméterek</label></div><div class="field"><label>Fényességi zajszűrés (térbeli): <span id="denoise_luma_spatialVal"></span></label><input id="denoise_luma_spatial" type="range" min="0" max="20" step="0.5" value="6"></div>
+<div class="field"><label>Színzajszűrés (térbeli): <span id="denoise_chroma_spatialVal"></span></label><input id="denoise_chroma_spatial" type="range" min="0" max="20" step="0.5" value="4"></div>
+<div class="field"><label>Fényességi zajszűrés (időbeli): <span id="denoise_luma_temporalVal"></span></label><input id="denoise_luma_temporal" type="range" min="0" max="20" step="0.5" value="9"></div>
+<div class="field"><label>Színzajszűrés (időbeli): <span id="denoise_chroma_temporalVal"></span></label><input id="denoise_chroma_temporal" type="range" min="0" max="20" step="0.5" value="6"></div>
+<div class="field"><label>Élesítés erőssége: <span id="sharpenVal"></span></label><input id="sharpen" type="range" min="-2" max="2" step="0.1" value="0.6"></div></div>
 <div class="field"><label>Gamma: <span id="gammaVal"></span></label><input id="gamma" type="range" min=".5" max="3" step=".05" value="1.9"></div>
 <div class="field"><label>Fényerő: <span id="brightnessVal"></span></label><input id="brightness" type="range" min="-.3" max=".3" step=".01" value=".06"></div>
 <div class="field"><label>Kontraszt: <span id="contrastVal"></span></label><input id="contrast" type="range" min=".5" max="2" step=".01" value="1.12"></div></div>
@@ -79,13 +84,15 @@ async function refreshFiles(selected) {
 }
 function settings() {
  return {filename:$('filename').value,ffmpeg:$('ffmpeg').checked,
- ffmpeg_filter:$('ffmpeg_filter').value,gamma:+$('gamma').value,brightness:+$('brightness').value,contrast:+$('contrast').value,
+ ffmpeg_filter:$('ffmpeg_filter').value,denoise_luma_spatial:+$('denoise_luma_spatial').value,denoise_chroma_spatial:+$('denoise_chroma_spatial').value,denoise_luma_temporal:+$('denoise_luma_temporal').value,denoise_chroma_temporal:+$('denoise_chroma_temporal').value,sharpen:+$('sharpen').value,gamma:+$('gamma').value,brightness:+$('brightness').value,contrast:+$('contrast').value,
  scunet:$('scunet').checked,scunet_model:$('scunet_model').value,
  realesrgan:$('realesrgan').checked,scale:+$('scale').value,
  preview_second:+$('preview_second').value,test_seconds:+$('test_seconds').value};
 }
-function syncSliders(){['gamma','brightness','contrast'].forEach(k=>$(k+'Val').textContent=$(k).value)}
+function syncSliders(){['gamma','brightness','contrast','denoise_luma_spatial','denoise_chroma_spatial','denoise_luma_temporal','denoise_chroma_temporal','sharpen'].forEach(k=>$(k+'Val').textContent=$(k).value)}
 ['gamma','brightness','contrast'].forEach(k=>$(k).oninput=syncSliders);syncSliders();
+function syncAdvanced(){ $('advanced_ffmpeg').style.display=$('ffmpeg_filter').value==='legacy_aggressive'?'':'none'; }
+$('ffmpeg_filter').addEventListener('change',syncAdvanced);syncAdvanced();
 $('uploadBtn').onclick=async()=>{const f=$('upload').files[0];if(!f)return alert('Válassz videót!');
  const data=new FormData();data.append('file',f);$('uploadBtn').disabled=true;$('status').textContent='Feltöltés folyamatban...';
  try{const r=await api('/api/upload',{method:'POST',body:data});await refreshFiles(r.name);$('status').textContent='Feltöltve: '+r.name}
