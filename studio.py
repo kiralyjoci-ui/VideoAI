@@ -17,6 +17,7 @@ ROOT = Path('/workspace/video_ai_studio')
 INPUTS = ROOT / 'inputs'
 OUTPUTS = ROOT / 'outputs'
 TEMP = ROOT / 'temp'
+EXISTING = Path('/workspace/video_tests')
 for folder in (INPUTS, OUTPUTS, TEMP):
     folder.mkdir(parents=True, exist_ok=True)
 HERE = Path(__file__).resolve().parent
@@ -41,9 +42,15 @@ class Settings(BaseModel):
     test_seconds: float = Field(0, ge=0, le=60)
 
 def allowed_path(name):
-    if Path(name).name != name or Path(name).suffix.lower() not in EXTENSIONS:
+    if name.startswith('tests/'):
+        basename = name[6:]
+        folder = EXISTING
+    else:
+        basename = name
+        folder = INPUTS
+    if Path(basename).name != basename or Path(basename).suffix.lower() not in EXTENSIONS:
         raise HTTPException(400, 'Invalid video filename')
-    path = INPUTS / name
+    path = folder / basename
     if not path.is_file():
         raise HTTPException(404, 'Video not found')
     return path
@@ -79,12 +86,15 @@ def home():
 @app.get('/api/files')
 def files():
     result = []
-    for p in sorted(INPUTS.iterdir()):
-        if p.is_file() and p.suffix.lower() in EXTENSIONS:
-            try:
-                result.append({'name': p.name, 'size': p.stat().st_size, **probe(p)})
-            except Exception:
-                result.append({'name': p.name, 'size': p.stat().st_size})
+    for folder, prefix in ((INPUTS, ''), (EXISTING, 'tests/')):
+        if not folder.is_dir():
+            continue
+        for p in sorted(folder.iterdir()):
+            if p.is_file() and p.suffix.lower() in EXTENSIONS:
+                try:
+                    result.append({'name': prefix+p.name, 'size': p.stat().st_size, **probe(p)})
+                except Exception:
+                    result.append({'name': prefix+p.name, 'size': p.stat().st_size})
     return result
 
 @app.post('/api/upload')
