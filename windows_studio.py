@@ -6,7 +6,8 @@ import os
 from pathlib import Path
 import httpx
 import base64
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, Request, HTTPException, UploadFile, File
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse, StreamingResponse, Response
 from contextlib import asynccontextmanager
 
@@ -34,6 +35,36 @@ async def local_status():
         return {"connected": r.status_code == 200, "http_status": r.status_code}
     except httpx.HTTPError:
         return {"connected": False, "http_status": None}
+
+@app.post("/api/upload")
+async def upload_optimized(file: UploadFile = File(...)):
+    """Spool the browser upload locally, then forward as a sized multipart body.
+
+    This avoids forwarding tiny ASGI chunks through HTTP chunked encoding over
+    the SSH tunnel, which can be extremely slow on high-latency connections.
+    UploadFile is disk-backed for large videos, not held in RAM.
+    """
+    password = os.getenv("VIDEOAI_PASSWORD")
+    if not password:
+        raise HTTPException(503, "Set VIDEOAI_PASSWORD on Windows first")
+    def forward():
+        file.file.seek(0)
+        try:
+            with httpx.Client(timeout=httpx.Timeout(1800, connect=15), trust_env=False) as client:
+                response = client.post(
+                    REMOTE + "/api/upload",
+                    files={"file": (file.filename or "video.mp4", file.file,
+                                    file.content_type or "application/octet-stream")},
+                    auth=(USERNAME, password),
+                )
+            return Response(content=response.content, status_code=response.status_code,
+                            media_type=response.headers.get("content-type", "application/json"))
+        except httpx.HTTPError as exc:
+            raise HTTPException(502, "RunPod upload failed: " + str(exc))
+    try:
+        return await run_in_threadpool(forward)
+    finally:
+        await file.close()
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE"])
 async def proxy(path: str, request: Request):
